@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Snip — URL Shortener</title>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --bg:        #0a0a0a;
+            --surface:   #111111;
+            --surface2:  #1a1a1a;
+            --border:    #2a2a2a;
+            --border2:   #333333;
+            --accent:    #c8f135;
+            --accent2:   #a8d420;
+            --text:      #f0f0f0;
+            --muted:     #666666;
+            --muted2:    #444444;
+            --danger:    #ff4444;
+            --success:   #c8f135;
+            --radius:    14px;
+            --radius-sm: 8px;
+        }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── Grid background ── */
+        body::before {
+            content: '';
+            position: fixed; inset: 0; z-index: 0;
+            background-image:
+                    linear-gradient(rgba(200,241,53,0.03) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(200,241,53,0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+        }
+
+        /* ── Glow orb ── */
+        .orb {
+            position: fixed;
+            width: 600px; height: 600px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(200,241,53,0.07) 0%, transparent 70%);
+            top: -200px; left: 50%; transform: translateX(-50%);
+            pointer-events: none; z-index: 0;
+        }
+
+        /* ── Layout ── */
+        .container {
+            position: relative; z-index: 1;
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 0 24px 80px;
+        }
+
+        /* ── Header ── */
+        header {
+            padding: 48px 0 60px;
+            text-align: center;
+        }
+
+        .logo {
+            display: inline-flex; align-items: center; gap: 10px;
+            margin-bottom: 32px;
+        }
+        .logo-mark {
+            width: 36px; height: 36px;
+            background: var(--accent);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .logo-mark svg { width: 20px; height: 20px; }
+        .logo-text {
+            font-family: 'Syne', sans-serif;
+            font-size: 22px; font-weight: 800;
+            color: var(--text);
+            letter-spacing: -0.5px;
+        }
+
+        h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: clamp(38px, 8vw, 64px);
+            font-weight: 800;
+            line-height: 1.05;
+            letter-spacing: -2px;
+            color: var(--text);
+            margin-bottom: 16px;
+            animation: fadeUp 0.6s ease both;
+        }
+        h1 span { color: var(--accent); }
+
+        .subtitle {
+            font-size: 16px;
+            color: var(--muted);
+            font-weight: 300;
+            letter-spacing: 0.01em;
+            animation: fadeUp 0.6s 0.1s ease both;
+        }
+
+        /* ── Card ── */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 28px;
+            margin-bottom: 16px;
+            animation: fadeUp 0.6s 0.2s ease both;
+        }
+
+        /* ── Input group ── */
+        .input-label {
+            font-size: 11px; font-weight: 500;
+            letter-spacing: 0.1em; text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .input-row {
+            display: flex; gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        input[type="url"], input[type="text"], input[type="datetime-local"] {
+            flex: 1;
+            background: var(--surface2);
+            border: 1px solid var(--border2);
+            border-radius: var(--radius-sm);
+            padding: 14px 16px;
+            font-family: 'DM Mono', monospace;
+            font-size: 13px;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+        input[type="url"]::placeholder,
+        input[type="text"]::placeholder { color: var(--muted2); }
+        input[type="url"]:focus,
+        input[type="text"]:focus,
+        input[type="datetime-local"]:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(200,241,53,0.08);
+        }
+        input[type="datetime-local"] { color-scheme: dark; }
+
+        /* ── Advanced toggle ── */
+        .advanced-toggle {
+            display: flex; align-items: center; gap: 8px;
+            cursor: pointer; user-select: none;
+            font-size: 13px; color: var(--muted);
+            margin-bottom: 0;
+            transition: color 0.2s;
+            width: fit-content;
+        }
+        .advanced-toggle:hover { color: var(--text); }
+        .toggle-icon {
+            width: 18px; height: 18px;
+            border: 1px solid var(--border2);
+            border-radius: 5px;
+            display: flex; align-items: center; justify-content: center;
+            transition: all 0.2s;
+            font-size: 10px;
+        }
+        .advanced-toggle.open .toggle-icon {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #000;
+        }
+
+        .advanced-panel {
+            display: none;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+        .advanced-panel.open { display: block; }
+
+        .fields-row {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+        }
+        .field-group { display: flex; flex-direction: column; }
+
+        /* ── Button ── */
+        .btn-shorten {
+            width: 100%;
+            background: var(--accent);
+            color: #000;
+            border: none;
+            border-radius: var(--radius-sm);
+            padding: 15px 24px;
+            font-family: 'Syne', sans-serif;
+            font-size: 15px; font-weight: 700;
+            letter-spacing: -0.3px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+            margin-top: 16px;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .btn-shorten:hover {
+            background: var(--accent2);
+            box-shadow: 0 0 30px rgba(200,241,53,0.25);
+        }
+        .btn-shorten:active { transform: scale(0.99); }
+        .btn-shorten:disabled {
+            opacity: 0.5; cursor: not-allowed; transform: none;
+        }
+        .btn-shorten .spinner {
+            width: 16px; height: 16px;
+            border: 2px solid rgba(0,0,0,0.2);
+            border-top-color: #000;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+            display: none;
+        }
+        .btn-shorten.loading .spinner { display: block; }
+        .btn-shorten.loading .btn-text { display: none; }
+
+        /* ── Error ── */
+        .error-box {
+            background: rgba(255,68,68,0.08);
+            border: 1px solid rgba(255,68,68,0.25);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            font-size: 13px; color: var(--danger);
+            margin-top: 12px;
+            display: none;
+        }
+        .error-box.show { display: block; }
+
+        /* ── Result card ── */
+        .result-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 24px 28px;
+            margin-bottom: 16px;
+            display: none;
+            animation: fadeUp 0.4s ease both;
+        }
+        .result-card.show { display: block; }
+
+        .result-label {
+            font-size: 11px; font-weight: 500;
+            letter-spacing: 0.1em; text-transform: uppercase;
+            color: var(--muted); margin-bottom: 12px;
+        }
+
+        .result-url-row {
+            display: flex; align-items: center; gap: 10px;
+            background: var(--surface2);
+            border: 1px solid var(--border2);
+            border-radius: var(--radius-sm);
+            padding: 4px 4px 4px 16px;
+        }
+
+        .result-url {
+            flex: 1;
+            font-family: 'DM Mono', monospace;
+            font-size: 14px;
+            color: var(--accent);
+            word-break: break-all;
+            font-weight: 500;
+        }
+
+        .btn-copy {
+            background: var(--border2);
+            border: none; border-radius: 6px;
+            padding: 9px 16px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 12px; font-weight: 500;
+            color: var(--text); cursor: pointer;
+            transition: all 0.2s; white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .btn-copy:hover { background: var(--accent); color: #000; }
+        .btn-copy.copied { background: var(--accent); color: #000; }
+
+        .result-meta {
+            display: flex; gap: 20px; flex-wrap: wrap;
+            margin-top: 16px; padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+        .meta-item { display: flex; flex-direction: column; gap: 3px; }
+        .meta-key {
+            font-size: 10px; font-weight: 500;
+            letter-spacing: 0.08em; text-transform: uppercase;
+            color: var(--muted);
+        }
+        .meta-val {
+            font-family: 'DM Mono', monospace;
+            font-size: 12px; color: var(--text);
+        }
+
+        /* ── History ── */
+        .history-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .history-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 14px; font-weight: 700;
+            color: var(--muted);
+            letter-spacing: -0.3px;
+        }
+        .btn-clear {
+            background: none; border: none;
+            font-size: 12px; color: var(--muted2);
+            cursor: pointer; transition: color 0.2s;
+            font-family: 'DM Sans', sans-serif;
+        }
+        .btn-clear:hover { color: var(--danger); }
+
+        .history-list { display: flex; flex-direction: column; gap: 8px; }
+
+        .history-item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            display: flex; align-items: center; gap: 12px;
+            transition: border-color 0.2s;
+            animation: fadeUp 0.3s ease both;
+        }
+        .history-item:hover { border-color: var(--border2); }
+
+        .history-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--accent); flex-shrink: 0;
+        }
+
+        .history-content { flex: 1; min-width: 0; }
+        .history-short {
+            font-family: 'DM Mono', monospace;
+            font-size: 13px; font-weight: 500;
+            color: var(--accent);
+            margin-bottom: 2px;
+        }
+        .history-original {
+            font-size: 12px; color: var(--muted);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+
+        .history-copy {
+            background: none; border: 1px solid var(--border2);
+            border-radius: 6px; padding: 5px 10px;
+            font-size: 11px; color: var(--muted);
+            cursor: pointer; transition: all 0.2s;
+            font-family: 'DM Sans', sans-serif; flex-shrink: 0;
+        }
+        .history-copy:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* ── Stats bar ── */
+        .stats-bar {
+            display: flex; gap: 1px;
+            background: var(--border);
+            border-radius: 12px; overflow: hidden;
+            margin-bottom: 16px;
+            animation: fadeUp 0.6s 0.3s ease both;
+        }
+        .stat {
+            flex: 1; background: var(--surface);
+            padding: 14px 16px; text-align: center;
+        }
+        .stat-num {
+            font-family: 'Syne', sans-serif;
+            font-size: 22px; font-weight: 800;
+            color: var(--accent); line-height: 1;
+            margin-bottom: 3px;
+        }
+        .stat-label {
+            font-size: 10px; font-weight: 500;
+            letter-spacing: 0.08em; text-transform: uppercase;
+            color: var(--muted);
+        }
+
+        /* ── Empty state ── */
+        .empty-state {
+            text-align: center; padding: 32px 16px;
+            color: var(--muted); font-size: 13px;
+        }
+
+        /* ── Animations ── */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 520px) {
+            .fields-row { grid-template-columns: 1fr; }
+            h1 { letter-spacing: -1.5px; }
+            .result-meta { gap: 14px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="orb"></div>
+
+<div class="container">
+
+    <!-- Header -->
+    <header>
+        <div class="logo">
+            <div class="logo-mark">
+                <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 4L4 10L8 16M12 4L16 10L12 16" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <span class="logo-text">snip</span>
+        </div>
+        <h1>Long URLs,<br/><span>cut short.</span></h1>
+        <p class="subtitle">Paste any URL. Get a clean, shareable link instantly.</p>
+    </header>
+
+    <!-- Stats bar -->
+    <div class="stats-bar">
+        <div class="stat">
+            <div class="stat-num" id="stat-total">0</div>
+            <div class="stat-label">Links created</div>
+        </div>
+        <div class="stat">
+            <div class="stat-num" id="stat-clicks">0</div>
+            <div class="stat-label">Total clicks</div>
+        </div>
+        <div class="stat">
+            <div class="stat-num" id="stat-today">0</div>
+            <div class="stat-label">Created today</div>
+        </div>
+    </div>
+
+    <!-- Main input card -->
+    <div class="card">
+        <label class="input-label">Paste your long URL</label>
+        <div class="input-row">
+            <input
+                    type="url"
+                    id="longUrl"
+                    placeholder="https://example.com/very/long/url/that/needs/shortening"
+                    autocomplete="off"
+                    spellcheck="false"
+            />
+        </div>
+
+        <!-- Advanced options toggle -->
+        <div class="advanced-toggle" id="advancedToggle" onclick="toggleAdvanced()">
+            <div class="toggle-icon" id="toggleIcon">+</div>
+            <span>Advanced options</span>
+        </div>
+
+        <!-- Advanced panel -->
+        <div class="advanced-panel" id="advancedPanel">
+            <div class="fields-row">
+                <div class="field-group">
+                    <label class="input-label">Custom alias (optional)</label>
+                    <input
+                            type="text"
+                            id="customAlias"
+                            placeholder="e.g. my-link"
+                            maxlength="30"
+                            spellcheck="false"
+                    />
+                </div>
+                <div class="field-group">
+                    <label class="input-label">Expiry date (optional)</label>
+                    <input type="datetime-local" id="expiryDate" />
+                </div>
+            </div>
+        </div>
+
+        <button class="btn-shorten" id="shortenBtn" onclick="shortenUrl()">
+            <div class="spinner"></div>
+            <span class="btn-text">Shorten URL →</span>
+        </button>
+
+        <div class="error-box" id="errorBox"></div>
+    </div>
+
+    <!-- Result card -->
+    <div class="result-card" id="resultCard">
+        <div class="result-label">Your short URL is ready</div>
+        <div class="result-url-row">
+            <div class="result-url" id="resultUrl"></div>
+            <button class="btn-copy" id="copyBtn" onclick="copyUrl()">Copy</button>
+        </div>
+        <div class="result-meta" id="resultMeta"></div>
+    </div>
+
+    <!-- History -->
+    <div id="historySection" style="display:none;">
+        <div class="history-header">
+            <span class="history-title">Recent links</span>
+            <button class="btn-clear" onclick="clearHistory()">Clear all</button>
+        </div>
+        <div class="history-list" id="historyList"></div>
+    </div>
+
+</div>
+
+<script>
+    // ── State ────────────────────────────────────────────────────────
+    const BASE = window.location.origin;
+    let history = JSON.parse(localStorage.getItem('snip_history') || '[]');
+    let lastShortUrl = '';
+
+    // ── Init ─────────────────────────────────────────────────────────
+    window.addEventListener('DOMContentLoaded', () => {
+        renderHistory();
+        loadStats();
+
+        // Enter key triggers shorten
+        document.getElementById('longUrl').addEventListener('keydown', e => {
+            if (e.key === 'Enter') shortenUrl();
+        });
+        document.getElementById('customAlias').addEventListener('keydown', e => {
+            if (e.key === 'Enter') shortenUrl();
+        });
+    });
+
+    // ── Advanced toggle ───────────────────────────────────────────────
+    function toggleAdvanced() {
+        const panel = document.getElementById('advancedPanel');
+        const toggle = document.getElementById('advancedToggle');
+        const icon = document.getElementById('toggleIcon');
+        panel.classList.toggle('open');
+        toggle.classList.toggle('open');
+        icon.textContent = panel.classList.contains('open') ? '−' : '+';
+    }
+
+    // ── Shorten ───────────────────────────────────────────────────────
+    async function shortenUrl() {
+        const urlInput = document.getElementById('longUrl').value.trim();
+        const alias    = document.getElementById('customAlias').value.trim();
+        const expiry   = document.getElementById('expiryDate').value;
+        const btn      = document.getElementById('shortenBtn');
+        const errorBox = document.getElementById('errorBox');
+
+        // Hide previous error & result
+        errorBox.classList.remove('show');
+        errorBox.textContent = '';
+
+        // Validate
+        if (!urlInput) {
+            showError('Please enter a URL to shorten.');
+            document.getElementById('longUrl').focus();
+            return;
+        }
+        if (!urlInput.startsWith('http://') && !urlInput.startsWith('https://')) {
+            showError('URL must start with http:// or https://');
+            return;
+        }
+
+        // Loading state
+        btn.classList.add('loading');
+        btn.disabled = true;
+
+        // Build request body
+        const body = { url: urlInput };
+        if (alias)  body.customAlias = alias;
+        if (expiry) body.expiryDate  = expiry + ':00';
+
+        try {
+            const res = await fetch(`${BASE}/api/shorten`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                // Show backend validation errors
+                if (data.message && typeof data.message === 'object') {
+                    const msgs = Object.values(data.message).join(' • ');
+                    showError(msgs);
+                } else {
+                    showError(data.message || 'Something went wrong. Please try again.');
+                }
+                return;
+            }
+
+            // Success!
+            showResult(data);
+            addToHistory(data, urlInput);
+            loadStats();
+
+            // Clear inputs
+            document.getElementById('longUrl').value = '';
+            document.getElementById('customAlias').value = '';
+            document.getElementById('expiryDate').value = '';
+
+        } catch (err) {
+            showError('Cannot connect to server. Make sure the Spring Boot app is running on port 8080.');
+        } finally {
+            btn.classList.remove('loading');
+            btn.disabled = false;
+        }
+    }
+
+    // ── Show result ───────────────────────────────────────────────────
+    function showResult(data) {
+        lastShortUrl = data.shortUrl;
+
+        document.getElementById('resultUrl').textContent = data.shortUrl;
+        document.getElementById('copyBtn').textContent = 'Copy';
+        document.getElementById('copyBtn').classList.remove('copied');
+
+        // Meta info
+        const meta = document.getElementById('resultMeta');
+        const items = [
+            { key: 'Short code', val: data.shortCode },
+            { key: 'Created',    val: formatDate(data.createdAt) },
+            { key: 'Clicks',     val: data.clickCount ?? 0 },
+        ];
+        if (data.expiryDate) items.push({ key: 'Expires', val: formatDate(data.expiryDate) });
+        if (data.customAlias) items.push({ key: 'Alias', val: data.customAlias });
+
+        meta.innerHTML = items.map(i =>
+            `<div class="meta-item">
+        <span class="meta-key">${i.key}</span>
+        <span class="meta-val">${i.val}</span>
+       </div>`
+        ).join('');
+
+        document.getElementById('resultCard').classList.add('show');
+        document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // ── Copy ──────────────────────────────────────────────────────────
+    function copyUrl() {
+        if (!lastShortUrl) return;
+        navigator.clipboard.writeText(lastShortUrl).then(() => {
+            const btn = document.getElementById('copyBtn');
+            btn.textContent = 'Copied ✓';
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.textContent = 'Copy';
+                btn.classList.remove('copied');
+            }, 2000);
+        });
+    }
+
+    // ── History ───────────────────────────────────────────────────────
+    function addToHistory(data, originalUrl) {
+        history.unshift({
+            shortUrl:    data.shortUrl,
+            shortCode:   data.shortCode,
+            originalUrl: originalUrl,
+            createdAt:   new Date().toISOString()
+        });
+        // Keep last 20 only
+        history = history.slice(0, 20);
+        localStorage.setItem('snip_history', JSON.stringify(history));
+        renderHistory();
+    }
+
+    function renderHistory() {
+        const section = document.getElementById('historySection');
+        const list    = document.getElementById('historyList');
+
+        if (history.length === 0) {
+            section.style.display = 'none';
+            return;
+        }
+
+        section.style.display = 'block';
+        list.innerHTML = history.map((item, i) => `
+      <div class="history-item" style="animation-delay:${i * 0.04}s">
+        <div class="history-dot"></div>
+        <div class="history-content">
+          <div class="history-short">${item.shortUrl}</div>
+          <div class="history-original">${item.originalUrl}</div>
+        </div>
+        <button class="history-copy" onclick="copyText('${item.shortUrl}', this)">Copy</button>
+      </div>
+    `).join('');
+    }
+
+    function clearHistory() {
+        history = [];
+        localStorage.removeItem('snip_history');
+        renderHistory();
+        document.getElementById('historySection').style.display = 'none';
+    }
+
+    function copyText(text, btn) {
+        navigator.clipboard.writeText(text).then(() => {
+            btn.textContent = 'Copied ✓';
+            btn.style.borderColor = 'var(--accent)';
+            btn.style.color = 'var(--accent)';
+            setTimeout(() => {
+                btn.textContent = 'Copy';
+                btn.style.borderColor = '';
+                btn.style.color = '';
+            }, 2000);
+        });
+    }
+
+    // ── Stats ─────────────────────────────────────────────────────────
+    async function loadStats() {
+        try {
+            const res  = await fetch(`${BASE}/api/urls`);
+            if (!res.ok) return;
+            const data = await res.json();
+
+            const total  = data.length;
+            const clicks = data.reduce((s, u) => s + (u.clickCount || 0), 0);
+            const today  = data.filter(u => {
+                if (!u.createdAt) return false;
+                const d = new Date(u.createdAt);
+                const n = new Date();
+                return d.toDateString() === n.toDateString();
+            }).length;
+
+            animateNum('stat-total',  total);
+            animateNum('stat-clicks', clicks);
+            animateNum('stat-today',  today);
+        } catch (_) {}
+    }
+
+    function animateNum(id, target) {
+        const el = document.getElementById(id);
+        const start = parseInt(el.textContent) || 0;
+        const diff  = target - start;
+        if (diff === 0) return;
+        const steps = 20;
+        let i = 0;
+        const t = setInterval(() => {
+            i++;
+            el.textContent = Math.round(start + diff * (i / steps));
+            if (i >= steps) clearInterval(t);
+        }, 20);
+    }
+
+    // ── Error ─────────────────────────────────────────────────────────
+    function showError(msg) {
+        const box = document.getElementById('errorBox');
+        box.textContent = msg;
+        box.classList.add('show');
+    }
+
+    // ── Util ──────────────────────────────────────────────────────────
+    function formatDate(iso) {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+</script>
+</body>
+</html>
